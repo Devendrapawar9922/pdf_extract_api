@@ -39,7 +39,7 @@ def process_text(text):
     data_list = []
     for match in matches:
         data_dict = {
-            'TEST NAME': match[0].strip(),
+            'TEST_NAME': match[0].strip(),
             'TECHNOLOGY': match[1].strip(),
             'VALUE': match[2].strip(),
             'UNITS': match[3].strip()
