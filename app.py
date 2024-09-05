@@ -78,14 +78,13 @@ def send_status(status_message, userid):
         "userid": userid
     }
     status_payload_str = json.dumps(status_payload)
-    # print(f"Sending status payload: {status_payload_str}")
+    print(f"Sending status payload: {status_payload_str}")
     print(f"Successfully send status payload:")
     
     try:
         response = requests.post(STATUS_URL, json=status_payload)
         if response.status_code in [200, 202]:
-            pass
-            # print("Status sent successfully")
+            print("Status sent successfully")
         else:
             print(f"Failed to send status: {response.status_code}")
     except requests.exceptions.RequestException as e:
@@ -128,8 +127,7 @@ def send_extracted_data(all_data_list):
     try:
         response = requests.post(POST_URL, json=payload)
         if response.status_code in [200, 202]:
-            pass
-            # print("Data sent successfully")
+            print("Data sent successfully")
         else:
             print(f"Failed to send data: {response.status_code}")
     except requests.exceptions.RequestException as e:
