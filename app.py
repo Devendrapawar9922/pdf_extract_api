@@ -121,7 +121,7 @@ def send_extracted_data(all_data_list):
     }
     
     payload_str = json.dumps(payload)
-    # print(f"Sending full data payload: {payload_str}")
+    print(f"Sending full data payload: {payload_str}")
     print(f"Successfully send full data payload ")
 
     try:
