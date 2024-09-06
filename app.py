@@ -1,3 +1,4 @@
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pdf2image import convert_from_path
@@ -15,6 +16,8 @@ load_dotenv()
 STATUS_URL = os.getenv('STATUS_URL')
 POST_URL = os.getenv('POST_URL') 
 
+os.makedirs("downloads", exist_ok=True)
+
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
@@ -30,7 +33,11 @@ def process_file():
     thread = threading.Thread(target=process_pdf_in_background, args=(file_url, userid,))
     thread.start()
 
-    return jsonify({"message": "Processing started"}), 202
+    # return jsonify({"message": "Processing started"}), 202
+    
+    return jsonify({"message" : "(ReportReceived) Processing started",
+                    'id': 3}), 202
+
 
 def process_pdf_in_background(file_url, userid):
     all_data_list = []
@@ -49,9 +56,10 @@ def process_pdf_in_background(file_url, userid):
 
         pages = convert_from_path(file_path) #Number
 
+        send_status("In-Process", userid)
+        
         for page_number, page in enumerate(pages):
             page_text = pytesseract.image_to_string(page)
-
             data_list = process_text(page_text, userid)
             all_data_list.extend(data_list)
 
@@ -59,7 +67,7 @@ def process_pdf_in_background(file_url, userid):
         send_status("Completed", userid)
         send_extracted_data(all_data_list)
         
-        #print(f"File processing complete")
+        print(f"File processing complete")
         
     except Exception as e:
         print(f"Error during PDF processing: {e}")
@@ -68,8 +76,7 @@ def process_pdf_in_background(file_url, userid):
         if os.path.exists(file_path):
             os.remove(file_path)
  
-       
-
+    
 
 def send_status(status_message, userid):
     status_payload = {
@@ -79,7 +86,7 @@ def send_status(status_message, userid):
     }
     status_payload_str = json.dumps(status_payload)
     print(f"Sending status payload: {status_payload_str}")
-    print(f"Successfully send status payload:")
+    #print(f"Successfully send status payload:")
     
     try:
         response = requests.post(STATUS_URL, json=status_payload)
@@ -122,17 +129,17 @@ def send_extracted_data(all_data_list):
     
     payload_str = json.dumps(payload)
     print(f"Sending full data payload: {payload_str}")
-    print(f"Successfully send full data payload ")
+    # print(f"Successfully send full data payload ")
 
     try:
         response = requests.post(POST_URL, json=payload)
         if response.status_code in [200, 202]:
-            print("Data sent successfully")
+            pass
+            # print("Data sent successfully")
         else:
             print(f"Failed to send data: {response.status_code}")
     except requests.exceptions.RequestException as e:
         print(f"Error sending data: {e}")
 
-if _name_ == '__main__':
-    os.makedirs("downloads", exist_ok=True)
+if __name__ == '__main__':
     app.run(debug=False, port=5568)
