@@ -1,4 +1,3 @@
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pdf2image import convert_from_path
@@ -11,15 +10,28 @@ import json
 from dotenv import load_dotenv
 
 
-load_dotenv()
-
-STATUS_URL = os.getenv('STATUS_URL')
-POST_URL = os.getenv('POST_URL') 
+STATUS_URL = "https://urjjaa-api.assimilate.co.in/api/LabMonitoring/SaveAiTestStaus"
+POST_URL = "https://urjjaa-api.assimilate.co.in/api/LabMonitoring/Post"
 
 os.makedirs("downloads", exist_ok=True)
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+
+test_pattern = re.compile(r'^(.*?)\s+(\d+\.?\d*)\s+([a-zA-Z%/]+|thou/mm3|mill/mm3|mL/min/1.73m2)\s+([<>\s0-9.\s-]+)$')
+
+
+test_names = [
+    "COMPLETE BLOOD COUNT",
+    "Differential Leucocyte Count (DLC)",
+    "Absolute Leucocyte Count",
+    "LIVER & KIDNEY PANEL, SERUM",
+    "LIPID SCREEN, SERUM",
+    "HbA1c (GLYCOSYLATED HEMOGLOBIN), BLOOD",
+    "GLUCOSE, FASTING (F), PLASMA",
+    "THYROID PROFILE,TOTAL, SERUM",
+    "VITAMIN B12; CYANOCOBALAMIN, SERUM"
+]
 
 @app.route('/UploadDocument', methods=['POST'])
 def process_file():
@@ -30,19 +42,17 @@ def process_file():
     file_url = data['fileUrl']
     userid = data['userid']
 
-    thread = threading.Thread(target=process_pdf_in_background, args=(file_url, userid,))
+    thread = threading.Thread(target=process_pdf_in_background, args=(file_url, userid))
     thread.start()
 
-    # return jsonify({"message": "Processing started"}), 202
-    
-    return jsonify({"message" : "(ReportReceived) Processing started",
-                    'id': 3}), 202
+    return jsonify({"message": "(ReportReceived) Processing started", 'id': 3}), 202
 
 
 def process_pdf_in_background(file_url, userid):
     all_data_list = []
+    text_content = []  
+    text_file_path = f"D:\\Task\\TEXT_EXTRACT_UI\\Backend\\extracted_text_{userid}.txt" 
     try:
-
         response = requests.get(file_url)
         if response.status_code != 200:
             print(f"Failed to download file: {response.status_code}")
@@ -54,42 +64,84 @@ def process_pdf_in_background(file_url, userid):
         with open(file_path, 'wb') as file:
             file.write(response.content)
 
-        pages = convert_from_path(file_path) #Number
+        pages = convert_from_path(file_path)
 
         send_status("In-Process", userid)
-        
+
         for page_number, page in enumerate(pages):
             page_text = pytesseract.image_to_string(page)
-            data_list = process_text(page_text, userid)
+            text_content.append(page_text)
+            data_list = process_text(page_text, userid)  
             all_data_list.extend(data_list)
 
-        
+        with open(text_file_path, 'w', encoding='utf-8') as text_file:
+            text_file.write("\n\n".join(text_content)) 
+
         send_status("Completed", userid)
         send_extracted_data(all_data_list)
-        
-        print(f"File processing complete")
-        
+
+        print(f"File processing complete. Extracted text saved to {text_file_path}")
+
     except Exception as e:
         print(f"Error during PDF processing: {e}")
-        send_status("Processing failed", userid)
+        send_status(f"Processing failed due to: {str(e)}", userid)
     finally:
-        if os.path.exists(file_path):
+        if file_path and os.path.exists(file_path):
             os.remove(file_path)
- 
-    
+
+
+
+def process_text(text, userid):
+    matches = test_pattern.findall(text)
+
+    data_list = []
+    current_test_name = ""
+
+    lines = text.split('\n')
+    for line in lines:
+        line = line.strip()
+
+        for test_name in test_names:
+            if test_name in line:
+                current_test_name = test_name
+                break
+
+
+        match = test_pattern.match(line)
+        if match:
+            parameter = match.group(1).strip()  
+            result = match.group(2)            
+            unit = match.group(3)              
+            # bio_ref_interval = match.group(4)   
+
+
+            data_dict = {
+                "testName": current_test_name,
+                "parameter": parameter,
+                "Result": result,
+                "unitName": unit,
+                # "Bio. Ref. Interval": bio_ref_interval,
+                "status": 8,
+                "userid": userid
+            }
+            data_list.append(data_dict)
+
+    return data_list
+
 
 def send_status(status_message, userid):
     status_payload = {
-        "testName": "Antitrypsin",
+        "testName": "Antitrypsin",  
         "statusName": status_message,
         "userid": userid
     }
     status_payload_str = json.dumps(status_payload)
     print(f"Sending status payload: {status_payload_str}")
-    #print(f"Successfully send status payload:")
     
+    headers = {'Content-Type': 'application/json'}
+
     try:
-        response = requests.post(STATUS_URL, json=status_payload)
+        response = requests.post(STATUS_URL, json=status_payload, headers=headers)
         if response.status_code in [200, 202]:
             print("Status sent successfully")
         else:
@@ -97,30 +149,6 @@ def send_status(status_message, userid):
     except requests.exceptions.RequestException as e:
         print(f"Error sending status: {e}")
 
-def process_text(text, userid):
-    pattern = r"(\b[A-Z ]+\s*\([A-Z]+\)\s*[A-Z.]*|[\w\s-]+)\s+([A-Z.]+\s*[A-Z]*)\s+([\d.]+)\s+(\S+)"
-    matches = re.findall(pattern, text, re.DOTALL)
-
-    data_list = []
-    for match in matches:
-        value_str = match[2].strip()
-        try:
-            if '.' in value_str:
-                value = float(value_str)
-            else:
-                value = int(value_str) 
-        except ValueError:
-            value = 0  
-
-        data_dict = {
-            "testName": match[0].strip(),
-            "value": value,  
-            "unitName": match[3].strip(),
-            "status": 8,
-            "userid": userid
-        }
-        data_list.append(data_dict)
-    return data_list
 
 def send_extracted_data(all_data_list):
     payload = {
@@ -129,17 +157,18 @@ def send_extracted_data(all_data_list):
     
     payload_str = json.dumps(payload)
     print(f"Sending full data payload: {payload_str}")
-    # print(f"Successfully send full data payload ")
-
+    
+    headers = {'Content-Type': 'application/json'}
+    
     try:
-        response = requests.post(POST_URL, json=payload)
+        response = requests.post(POST_URL, json=payload, headers=headers)
         if response.status_code in [200, 202]:
-            pass
-            # print("Data sent successfully")
+            print("Data sent successfully")
         else:
             print(f"Failed to send data: {response.status_code}")
     except requests.exceptions.RequestException as e:
         print(f"Error sending data: {e}")
+
 
 if __name__ == '__main__':
     app.run(debug=False, port=5568)
