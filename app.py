@@ -1,14 +1,16 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from pdf2image import convert_from_path
-import pytesseract
+# import pytesseract
 import re
 import os
 import threading
 import requests
 import json
-from dotenv import load_dotenv
+from dotenv import load_dotenv    # python-dotenv
+import pdfplumber  
 
+
+load_dotenv()
 
 STATUS_URL = "https://urjjaa-api.assimilate.co.in/api/LabMonitoring/SaveAiTestStaus"
 POST_URL = "https://urjjaa-api.assimilate.co.in/api/LabMonitoring/Post"
@@ -19,7 +21,6 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 test_pattern = re.compile(r'^(.*?)\s+(\d+\.?\d*)\s+([a-zA-Z%/]+|thou/mm3|mill/mm3|mL/min/1.73m2)\s+([<>\s0-9.\s-]+)$')
-
 
 test_names = [
     "COMPLETE BLOOD COUNT",
@@ -50,8 +51,10 @@ def process_file():
 
 def process_pdf_in_background(file_url, userid):
     all_data_list = []
-    text_content = []  
-    text_file_path = f"D:\\Task\\TEXT_EXTRACT_UI\\Backend\\extracted_text_{userid}.txt" 
+    text_content = []
+    
+
+    text_file_path = "downloads/extracted_text.txt"
     try:
         response = requests.get(file_url)
         if response.status_code != 200:
@@ -63,24 +66,27 @@ def process_pdf_in_background(file_url, userid):
 
         with open(file_path, 'wb') as file:
             file.write(response.content)
+        print(f"File processing complete. Extracted text saved to {text_file_path}")
 
-        pages = convert_from_path(file_path)
 
         send_status("In-Process", userid)
 
-        for page_number, page in enumerate(pages):
-            page_text = pytesseract.image_to_string(page)
-            text_content.append(page_text)
-            data_list = process_text(page_text, userid)  
-            all_data_list.extend(data_list)
+    
+        with pdfplumber.open(file_path) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text_content.append(page_text)
+                    data_list = process_text(page_text, userid)
+                    all_data_list.extend(data_list)
 
         with open(text_file_path, 'w', encoding='utf-8') as text_file:
-            text_file.write("\n\n".join(text_content)) 
+            text_file.write("\n\n".join(text_content))
 
         send_status("Completed", userid)
         send_extracted_data(all_data_list)
 
-        print(f"File processing complete. Extracted text saved to {text_file_path}")
+        
 
     except Exception as e:
         print(f"Error during PDF processing: {e}")
@@ -88,7 +94,6 @@ def process_pdf_in_background(file_url, userid):
     finally:
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
-
 
 
 def process_text(text, userid):
@@ -106,21 +111,17 @@ def process_text(text, userid):
                 current_test_name = test_name
                 break
 
-
         match = test_pattern.match(line)
         if match:
             parameter = match.group(1).strip()  
             result = match.group(2)            
             unit = match.group(3)              
-            # bio_ref_interval = match.group(4)   
-
 
             data_dict = {
                 "testName": current_test_name,
                 "parameter": parameter,
-                "Result": result,
+                "value": result,
                 "unitName": unit,
-                # "Bio. Ref. Interval": bio_ref_interval,
                 "status": 8,
                 "userid": userid
             }
