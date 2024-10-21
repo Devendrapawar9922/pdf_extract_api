@@ -42,14 +42,15 @@ def process_file():
 
     file_url = data['fileUrl']
     userid = data['userid']
+    bookingId = data['bookingId']
 
-    thread = threading.Thread(target=process_pdf_in_background, args=(file_url, userid))
+    thread = threading.Thread(target=process_pdf_in_background, args=(file_url, userid, bookingId))
     thread.start()
 
     return jsonify({"message": "(ReportReceived) Processing started", 'id': 3}), 202
 
 
-def process_pdf_in_background(file_url, userid):
+def process_pdf_in_background(file_url, userid, bookingId):
     all_data_list = []
     text_content = []
     
@@ -59,7 +60,7 @@ def process_pdf_in_background(file_url, userid):
         response = requests.get(file_url)
         if response.status_code != 200:
             print(f"Failed to download file: {response.status_code}")
-            send_status("Download failed", userid)
+            send_status("Download failed", userid,bookingId)
             return
 
         file_path = os.path.join("downloads", f"temp_{userid}.pdf")
@@ -69,7 +70,7 @@ def process_pdf_in_background(file_url, userid):
         print(f"File processing complete. Extracted text saved to {text_file_path}")
 
 
-        send_status("In-Process", userid)
+        send_status("In-Process", userid, bookingId)
 
     
         with pdfplumber.open(file_path) as pdf:
@@ -77,26 +78,26 @@ def process_pdf_in_background(file_url, userid):
                 page_text = page.extract_text()
                 if page_text:
                     text_content.append(page_text)
-                    data_list = process_text(page_text, userid)
+                    data_list = process_text(page_text, userid,bookingId)
                     all_data_list.extend(data_list)
 
         with open(text_file_path, 'w', encoding='utf-8') as text_file:
             text_file.write("\n\n".join(text_content))
 
-        send_status("Completed", userid)
+        send_status("Completed", userid, bookingId)
         send_extracted_data(all_data_list)
 
         
 
     except Exception as e:
         print(f"Error during PDF processing: {e}")
-        send_status(f"Processing failed due to: {str(e)}", userid)
+        send_status(f"Processing failed due to: {str(e)}", userid, bookingId)
     finally:
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
 
 
-def process_text(text, userid):
+def process_text(text, userid, bookingId):
     matches = test_pattern.findall(text)
 
     data_list = []
@@ -123,18 +124,20 @@ def process_text(text, userid):
                 "value": result,
                 "unitName": unit,
                 "status": 8,
-                "userid": userid
+                "userid": userid,
+                "bookingId": bookingId
             }
             data_list.append(data_dict)
 
     return data_list
 
 
-def send_status(status_message, userid):
+def send_status(status_message, userid, bookingId):
     status_payload = {
         "testName": "Antitrypsin",  
         "statusName": status_message,
-        "userid": userid
+        "userid": userid,
+        "bookingId": bookingId
     }
     status_payload_str = json.dumps(status_payload)
     print(f"Sending status payload: {status_payload_str}")
