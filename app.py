@@ -20,7 +20,10 @@ os.makedirs("downloads", exist_ok=True)
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
-test_pattern = re.compile(r'^(.*?)\s+(\d+\.?\d*)\s+([a-zA-Z%/]+|thou/mm3|mill/mm3|mL/min/1.73m2)\s+([<>\s0-9.\s-]+)$')
+# test_pattern = re.compile(r'^(.*?)\s+(\d+\.?\d*)\s+([a-zA-Z%/]+|thou/mm3|mill/mm3|mL/min/1.73m2)\s+([<>\s0-9.\s-]+)$')
+
+
+test_pattern = re.compile(r'^(.*?)\s+(\d+\.?\d*)\s+([a-zA-Z%/.-]+|thou/mm3|mill/mm3|mL/min/1.73m2)\s+([<>\s0-9.-]+)$')
 
 test_names = [
     "COMPLETE BLOOD COUNT",
@@ -31,7 +34,14 @@ test_names = [
     "HbA1c (GLYCOSYLATED HEMOGLOBIN), BLOOD",
     "GLUCOSE, FASTING (F), PLASMA",
     "THYROID PROFILE,TOTAL, SERUM",
-    "VITAMIN B12; CYANOCOBALAMIN, SERUM"
+    "VITAMIN B12; CYANOCOBALAMIN, SERUM",
+    "URINE EXAMINATION, ROUTINE; URINE, R/E",
+    "LIPID",
+    "LIVER",
+    "RENAL",
+    "THYROID",
+    "DIABETES",
+    "COMPLETE HEMOGRAM",
 ]
 
 @app.route('/UploadDocument', methods=['POST'])
@@ -176,3 +186,9 @@ def send_extracted_data(all_data_list):
 
 if __name__ == '__main__':
     app.run(debug=False, port=5568)
+    
+    
+# {
+#     "fileKey": "2a57488a-d5fa-4cfb-9639-cbf469e618e4_SREEJITH-3.pdf",
+#     "fileUrl": "https://at-erp-dev.s3.ap-south-1.amazonaws.com/2a57488a-d5fa-4cfb-9639-cbf469e618e4_SREEJITH-3.pdf?X-Amz-Expires=604800&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIARUFMKKPRR37TQCXV%2F20241111%2Fap-south-1%2Fs3%2Faws4_request&X-Amz-Date=20241111T092913Z&X-Amz-SignedHeaders=host&X-Amz-Signature=ae4847321b47085ca7b8a6536c1ec857aeec691116306ea5e68a483af3af33f8"
+# }
