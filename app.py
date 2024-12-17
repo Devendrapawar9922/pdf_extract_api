@@ -21,9 +21,14 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 # test_pattern = re.compile(r'^(.*?)\s+(\d+\.?\d*)\s+([a-zA-Z%/]+|thou/mm3|mill/mm3|mL/min/1.73m2)\s+([<>\s0-9.\s-]+)$')
+# test_pattern = re.compile(r'^(.*?)\s+(\d+\.?\d*)\s+([a-zA-Z%/.-]+|thou/mm3|mill/mm3|mL/min/1.73m2)\s+([<>\s0-9.-]+)$')
 
-
-test_pattern = re.compile(r'^(.*?)\s+(\d+\.?\d*)\s+([a-zA-Z%/.-]+|thou/mm3|mill/mm3|mL/min/1.73m2)\s+([<>\s0-9.-]+)$')
+test_pattern = re.compile(
+    r'^(.*?\s+)?' 
+    r'(\d+\.?\d*\s*\*?|Nil|Light Yellow|Traces(10.0 mg/dL)|Negative|Normal|Few|None seen|3-4 WBC/HPF|Positive|Indeterminate|Abnormal|Out of Range|Mild|Moderate|Severe|Rare|Many|Normal Range|)\s*'
+    r'([a-zA-Z%/\*.\^\d/-]+|thou/mm3|mill/mm3|mL/min/1\.73m2|X 10³ / µL|X 10\^6/µL|µIU/mL|mL/min/1.73m2)\s+' 
+    r'([<>\s0-9.\*\-\/]*)$'  
+)
 
 test_names = [
     "COMPLETE BLOOD COUNT",
@@ -149,13 +154,13 @@ def send_status(status_message, userid, bookingId):
         "userid": userid,
         "bookingId": bookingId
     }
-    status_payload_str = json.dumps(status_payload)
+    status_payload_str = json.dumps(status_payload, ensure_ascii=False)  # This keeps Unicode symbols intact
     print(f"Sending status payload: {status_payload_str}")
     
     headers = {'Content-Type': 'application/json'}
 
     try:
-        response = requests.post(STATUS_URL, json=status_payload, headers=headers)
+        response = requests.post(STATUS_URL, data=status_payload_str, headers=headers)  # Send the raw JSON string
         if response.status_code in [200, 202]:
             print("Status sent successfully")
         else:
@@ -169,13 +174,13 @@ def send_extracted_data(all_data_list):
         "labMonitoringRequest": all_data_list
     }
     
-    payload_str = json.dumps(payload)
+    payload_str = json.dumps(payload, ensure_ascii=False) 
     print(f"Sending full data payload: {payload_str}")
     
     headers = {'Content-Type': 'application/json'}
     
     try:
-        response = requests.post(POST_URL, json=payload, headers=headers)
+        response = requests.post(POST_URL, data=payload_str, headers=headers) 
         if response.status_code in [200, 202]:
             print("Data sent successfully")
         else:
