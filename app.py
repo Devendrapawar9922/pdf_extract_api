@@ -25,7 +25,7 @@ CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 test_pattern = re.compile(
     r'^(.*?\s+)?' 
-    r'(\d+\.?\d*\s*\*?|Nil|Light Yellow|Traces(10.0 mg/dL)|Negative|Normal|Few|None seen|3-4 WBC/HPF|Positive|Indeterminate|Abnormal|Out of Range|Mild|Moderate|Severe|Rare|Many|Normal Range|)\s*'
+    r'(\d+\.?\d*\s*\*?|Nil)\s*'
     r'([a-zA-Z%/\*.\^\d/-]+|thou/mm3|mill/mm3|mL/min/1\.73m2|X 10³ / µL|X 10\^6/µL|µIU/mL|mL/min/1.73m2)\s+' 
     r'([<>\s0-9.\*\-\/]*)$'  
 )
